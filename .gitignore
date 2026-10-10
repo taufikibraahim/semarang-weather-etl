@@ -1,0 +1,31 @@
+# Python cache 
+__pycache__/
+*.py[cod]
+
+# Virtual environment
+.venv/
+venv/
+
+# Environtment variables and secrets
+.env
+.env.*
+!.env.example
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# VS Code settings
+.vscode/
+
+# logs
+*.log
+logs/
+
+# Local database files
+*.db
+*.sqlite
+*.sqlite3
+
+# OS generated files
+.DS_Store
+Thumbs.db
