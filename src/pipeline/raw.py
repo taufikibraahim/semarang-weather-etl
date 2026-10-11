@@ -1,12 +1,10 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-
-from .config import RAW_DIR
 
 
 def save_raw(df, raw_dir):
-    """Save the unmodified DataFrame as a timestamped Parquet file. 
-    
+    """Save the unmodified DataFrame as a timestamped Parquet file.
+
     :param df: DataFrame straight from ``response_to_dataframe``
     :param raw_dir: directory for raw files
     :return: path of the saved file
@@ -15,9 +13,9 @@ def save_raw(df, raw_dir):
     # 1. Make sure directory available
     raw_dir = Path(raw_dir)
     raw_dir.mkdir(parents=True, exist_ok=True)
-    
+
     # 2. Make file parquet with now datetime
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
+    timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S_%f")
     file_path = raw_dir / f"weather_raw_{timestamp}.parquet"
 
     # 3. Save DataFrame to parquet

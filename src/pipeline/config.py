@@ -14,12 +14,13 @@ HOURLY_VARIABLES = [
 ]
 
 COLUMN_RENAMES = {
-        "temperature_2m": "temperature_c",
-        "precipitation_probability": "precip_probability_pct",
-        "relative_humidity_2m": "humidity_pct",
-        "apparent_temperature": "apparent_temperature_c",
-        "wind_speed_10m": "wind_speed_kmh",
-        "rain": "rain_mm",
-        }
+    "temperature_2m": "temperature_c",
+    "precipitation_probability": "precip_probability_pct",
+    "relative_humidity_2m": "humidity_pct",
+    "apparent_temperature": "apparent_temperature_c",
+    "wind_speed_10m": "wind_speed_kmh",
+    "rain": "rain_mm",
+}
 
 DB_PATH = "data/weather.db"
+RAW_DIR = "data/raw"

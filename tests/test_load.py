@@ -2,7 +2,7 @@ import sqlite3
 
 import pytest
 
-from src.pipeline.load import COLUMNS, save_to_sqlite
+from src.pipeline.load import save_to_sqlite
 from src.pipeline.transform import clean_weather
 
 
@@ -13,7 +13,8 @@ def clean_df(raw_weather_df):
 
 def count_rows(db_path):
     with sqlite3.connect(db_path) as conn:
-        return conn.execute("SELECT COUNT(*) FROM hourly_weather").fetchone()[0]
+        query = "SELECT COUNT(*) FROM hourly_weather"
+        return conn.execute(query).fetchone()[0]
 
 
 def test_save_creates_database_and_rows(tmp_path, clean_df):
@@ -39,8 +40,8 @@ def test_upsert_overwrites_with_latest_value(tmp_path, clean_df):
     save_to_sqlite(updated, db_path)
 
     with sqlite3.connect(db_path) as conn:
-        temps = {r[0] for r in conn.execute(
-            "SELECT temperature_c FROM hourly_weather")}
+        query = "SELECT temperature_c FROM hourly_weather"
+        temps = {r[0] for r in conn.execute(query)}
     assert temps == {99.0}
     assert count_rows(db_path) == len(clean_df)
 

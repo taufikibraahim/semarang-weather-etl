@@ -1,6 +1,7 @@
 import pandas as pd
 
-from .config import HOURLY_VARIABLES, COLUMN_RENAMES
+from .config import COLUMN_RENAMES, HOURLY_VARIABLES
+
 
 def response_to_dataframe(response):
     """Convert an Open-Meteo response into an hourly DataFrame.
@@ -14,7 +15,7 @@ def response_to_dataframe(response):
             start=pd.to_datetime(hourly.Time(), unit="s", utc=True),
             end=pd.to_datetime(hourly.TimeEnd(), unit="s", utc=True),
             freq=pd.Timedelta(seconds=hourly.Interval()),
-            inclusive="left"
+            inclusive="left",
         ).tz_convert(response.Timezone().decode())
     }
 
@@ -22,6 +23,7 @@ def response_to_dataframe(response):
         hourly_data[name] = hourly.Variables(index).ValuesAsNumpy()
     df = pd.DataFrame(data=hourly_data)
     return df
+
 
 def clean_weather(df):
     """Clean the weather DataFrame.

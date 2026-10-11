@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from src.pipeline.config import COLUMN_RENAMES, HOURLY_VARIABLES
+from src.pipeline.config import HOURLY_VARIABLES
 
 
 @pytest.fixture()
@@ -11,7 +11,7 @@ def raw_weather_df():
         "2026-10-10 00:00",
         periods=3,
         freq="h",
-        tz="Asia/Jakarta"
+        tz="Asia/Jakarta",
     )
     data = {"date": dates}
     for i, name in enumerate(HOURLY_VARIABLES):

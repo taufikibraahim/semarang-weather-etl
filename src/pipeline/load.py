@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS hourly_weather (
     humidity_pct REAL,
     apparent_temperature_c REAL,
     wind_speed_kmh REAL,
-    rain_mm REAL        
+    rain_mm REAL
 )
 """
 
@@ -36,7 +36,7 @@ ON CONFLICT(date) DO UPDATE SET
 """.format(
     cols=", ".join(COLUMNS),
     marks=", ".join("?" for _ in COLUMNS),
-    updates=", ".join(f"{col}=excluded.{col}" for col in COLUMNS[1:])
+    updates=", ".join(f"{col}=excluded.{col}" for col in COLUMNS[1:]),
 )
 
 
@@ -67,7 +67,6 @@ def save_to_sqlite(df, db_path):
     :param db_path: path to the SQLite file
     """
     Path(db_path).parent.mkdir(parents=True, exist_ok=True)
-    with closing(sqlite3.connect(db_path)) as conn:
-        with conn:
-            create_table(conn)
-            return upsert_rows(conn, df)
+    with closing(sqlite3.connect(db_path)) as conn, conn:
+        create_table(conn)
+        return upsert_rows(conn, df)
