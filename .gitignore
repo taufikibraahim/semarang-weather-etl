@@ -29,3 +29,12 @@ logs/
 # OS generated files
 .DS_Store
 Thumbs.db
+
+# Cache sqlite files
+.cache.sqlite
+
+# Data (dapat dibuat ulang oleh pipeline)
+data/
+
+# Test cache
+.pytest_cache/
