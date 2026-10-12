@@ -266,6 +266,15 @@ maksimumnya karena persentase tidak boleh dijumlahkan.
 | 2026-10-17 |             0 |           0 |                  39 |
 | 2026-10-18 |             0 |           0 |                  69 |
 
+## Visualisasi
+
+![Suhu harian](docs/daily_temperature.png)
+![Total hujan harian](docs/daily_rain.png)
+![Hujan per jam](docs/rain_by_hour.png)
+
+Gambar dibuat dari data di SQLite lewat `src/pipeline/visualize.py`
+(data prakiraan; diambil 12-10-2026).
+
 ### Daftar lengkap query
 
 | Fungsi                         | Menjawab                                                        |

@@ -7,6 +7,7 @@ DB_PATH = BASE_DIR / "data" / "weather.db"
 RAW_DIR = BASE_DIR / "data" / "raw"
 LOG_FILE = BASE_DIR / "logs" / "pipeline.log"
 CACHE_PATH = BASE_DIR / "data" / "cache" / "http_cache"
+DOCS_DIR = BASE_DIR / "docs"
 
 API_URL = "https://api.open-meteo.com/v1/forecast"
 LATITUDE = -6.966667
