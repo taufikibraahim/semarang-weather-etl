@@ -65,4 +65,6 @@ def save_to_sqlite(df, db_path):
     Path(db_path).parent.mkdir(parents=True, exist_ok=True)
     with closing(sqlite3.connect(db_path)) as conn:
         create_table(conn)
-        return upsert_rows(conn, df)
+        rows_written = upsert_rows(conn, df)
+        conn.commit()
+    return rows_written
