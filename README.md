@@ -193,48 +193,88 @@ ke belakang, tetapi tetap berasal dari model.
 
 ## Contoh query
 
-Buka database dengan DB Browser for SQLite, ekstensi SQLite Viewer di VS Code,
-atau Python:
+Query ada di `src/pipeline/queries.py`, tiap query berupa fungsi yang
+mengembalikan DataFrame:
 
 ```python
-import sqlite3
+from src.pipeline.config import DB_PATH
+from src.pipeline.queries import open_readonly, daily_temperature
 
-conn = sqlite3.connect("data/weather.db")
-print(conn.execute("SELECT COUNT(*) FROM hourly_weather").fetchone())
+conn = open_readonly(DB_PATH)
+print(daily_temperature(conn))
+conn.close()
 ```
 
-**Rentang data dan jumlah baris**
+### Suhu harian
 
-```sql
-SELECT COUNT(*) AS jumlah_baris,
-       MIN(date) AS awal,
-       MAX(date) AS akhir
-FROM hourly_weather;
-```
+Rata-rata, minimum, dan maksimum suhu per hari. Hanya hari dengan 24 jam
+data lengkap yang dihitung.
 
-**Rata-rata, minimum, dan maksimum suhu per hari**
+| day        | hours | avg_temp_c | min_temp_c | max_temp_c |
+| :--------- | ----: | ---------: | ---------: | ---------: |
+| 2026-10-03 |    24 |       30.1 |      25.65 |       36.1 |
+| 2026-10-04 |    24 |       29.7 |       24.8 |      35.95 |
+| 2026-10-05 |    24 |       29.7 |      25.25 |      36.05 |
+| 2026-10-06 |    24 |       30.9 |       26.5 |      37.25 |
+| 2026-10-07 |    24 |         30 |      26.65 |       35.3 |
+| 2026-10-08 |    24 |         29 |      25.25 |      34.85 |
+| 2026-10-09 |    24 |       28.3 |       25.1 |      32.55 |
+| 2026-10-10 |    24 |       28.9 |      24.35 |       35.3 |
+| 2026-10-11 |    24 |       29.7 |      25.55 |      36.65 |
+| 2026-10-12 |    24 |         30 |      26.35 |      35.35 |
+| 2026-10-13 |    24 |       30.3 |         27 |       36.3 |
+| 2026-10-14 |    24 |       30.2 |       26.2 |      36.05 |
+| 2026-10-15 |    24 |       30.2 |      25.65 |       36.7 |
+| 2026-10-16 |    24 |       30.4 |       25.9 |      37.15 |
+| 2026-10-17 |    24 |       30.3 |       26.1 |       35.8 |
+| 2026-10-18 |    24 |       30.6 |       27.8 |       35.5 |
 
-```sql
-SELECT substr(date, 1, 10) AS tanggal,
-       ROUND(AVG(temperature_c), 1) AS suhu_rata2,
-       MIN(temperature_c) AS suhu_min,
-       MAX(temperature_c) AS suhu_max
-FROM hourly_weather
-GROUP BY tanggal
-ORDER BY tanggal;
-```
+### Hari terpanas
 
-**Total hujan per hari** (`rain_mm` dijumlahkan, peluang tidak)
+| day        | max_temp_c | avg_temp_c |
+| :--------- | ---------: | ---------: |
+| 2026-10-06 |      37.25 |       30.9 |
+| 2026-10-16 |      37.15 |       30.4 |
+| 2026-10-15 |       36.7 |       30.2 |
+| 2026-10-11 |      36.65 |       29.7 |
+| 2026-10-13 |       36.3 |       30.3 |
 
-```sql
-SELECT substr(date, 1, 10) AS tanggal,
-       ROUND(SUM(rain_mm), 1) AS total_hujan_mm
-FROM hourly_weather
-GROUP BY tanggal
-ORDER BY total_hujan_mm DESC;
-```
+### Total hujan per hari
 
-Query analitik lain akan ditambahkan di bagian ini.
+cls
+`rain_mm` dijumlahkan, sedangkan probabilitas hanya diambil nilai
+maksimumnya karena persentase tidak boleh dijumlahkan.
+
+| day        | total_rain_mm | rainy_hours | max_precip_prob_pct |
+| :--------- | ------------: | ----------: | ------------------: |
+| 2026-10-03 |           0.6 |           4 |                  80 |
+| 2026-10-04 |           1.8 |           4 |                  53 |
+| 2026-10-05 |           0.1 |           1 |                  86 |
+| 2026-10-06 |             0 |           0 |                   9 |
+| 2026-10-07 |           0.8 |           3 |                  75 |
+| 2026-10-08 |           4.4 |           8 |                 100 |
+| 2026-10-09 |           1.6 |           7 |                  92 |
+| 2026-10-10 |           0.7 |           4 |                  41 |
+| 2026-10-11 |           0.7 |           5 |                  92 |
+| 2026-10-12 |           0.7 |           6 |                  71 |
+| 2026-10-13 |             0 |           0 |                  37 |
+| 2026-10-14 |             0 |           0 |                  14 |
+| 2026-10-15 |             0 |           0 |                   7 |
+| 2026-10-16 |             0 |           0 |                  12 |
+| 2026-10-17 |             0 |           0 |                  39 |
+| 2026-10-18 |             0 |           0 |                  69 |
+
+### Daftar lengkap query
+
+| Fungsi                         | Menjawab                                                        |
+| ------------------------------ | --------------------------------------------------------------- |
+| `data_overview`                | jumlah baris dan rentang tanggal                                |
+| `daily_temperature`            | suhu rata-rata, min, max per hari                               |
+| `hottest_days`                 | hari terpanas                                                   |
+| `most_humid_days`              | hari paling lembap                                              |
+| `daily_rain`                   | total hujan dan peluang tertinggi per hari                      |
+| `rain_by_hour`                 | jam dengan hujan terbanyak                                      |
+| `temperature_vs_daily_average` | selisih suhu tiap jam dengan rata-rata harian (window function) |
 
 ## Pengujian
 
@@ -267,8 +307,8 @@ flake8 src tests main.py
 
 ## Rencana pengembangan
 
-- [ ] Query analitik dan visualisasi
-- [ ] Retensi file raw (hapus yang lebih lama dari N hari)
-- [ ] GitHub Actions untuk menjalankan tes dan flake8
-- [ ] Migrasi orkestrasi ke Airflow (Docker)
-- [ ] Migrasi database ke PostgreSQL
+- [x] Query analitik dan visualisasi
+- [x] Retensi file raw (hapus yang lebih lama dari N hari)
+- [x] GitHub Actions untuk menjalankan tes dan flake8
+- [x] Migrasi orkestrasi ke Airflow (Docker)
+- [x] Migrasi database ke PostgreSQL
