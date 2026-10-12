@@ -1,5 +1,7 @@
 # Semarang Weather ETL
 
+![CI](https://github.com/taufikibraahim/semarang-weather-etl/actions/workflows/ci.yml/badge.svg)
+
 Pipeline ETL yang mengambil **prakiraan cuaca per jam untuk Semarang** dari
 [Open-Meteo](https://open-meteo.com/), menyimpan data mentah, membersihkan dan
 memvalidasinya, lalu memuatnya ke **SQLite** secara idempoten. Pipeline
