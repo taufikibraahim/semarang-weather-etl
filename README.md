@@ -99,7 +99,7 @@ semarang_weather_etl/
 Prasyarat: Python 3.10 atau lebih baru dan Git.
 
 ```bash
-git clone <URL-REPO-KAMU>
+git clone https://github.com/taufikibraahim/semarang-weather-etl
 cd semarang_weather_etl
 
 python -m venv .venv
