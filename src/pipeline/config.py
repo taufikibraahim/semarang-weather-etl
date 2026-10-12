@@ -1,3 +1,13 @@
+from pathlib import Path
+
+BASE_DIR = Path(__file__).resolve().parents[2]
+
+
+DB_PATH = BASE_DIR / "data" / "weather.db"
+RAW_DIR = BASE_DIR / "data" / "raw"
+LOG_FILE = BASE_DIR / "logs" / "pipeline.log"
+CACHE_PATH = BASE_DIR / "data" / "cache" / "http_cache"
+
 API_URL = "https://api.open-meteo.com/v1/forecast"
 LATITUDE = -6.966667
 LONGITUDE = 110.416664
@@ -10,7 +20,7 @@ HOURLY_VARIABLES = [
     "relative_humidity_2m",
     "apparent_temperature",
     "wind_speed_10m",
-    "rain"
+    "rain",
 ]
 
 COLUMN_RENAMES = {
@@ -21,6 +31,3 @@ COLUMN_RENAMES = {
     "wind_speed_10m": "wind_speed_kmh",
     "rain": "rain_mm",
 }
-
-DB_PATH = "data/weather.db"
-RAW_DIR = "data/raw"
