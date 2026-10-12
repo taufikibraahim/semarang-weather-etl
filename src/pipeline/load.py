@@ -2,10 +2,6 @@ import sqlite3
 from contextlib import closing
 from pathlib import Path
 
-from .config import DB_PATH
-
-conn = sqlite3.connect(DB_PATH)
-
 COLUMNS = [
     "date",
     "temperature_c",
@@ -67,6 +63,6 @@ def save_to_sqlite(df, db_path):
     :param db_path: path to the SQLite file
     """
     Path(db_path).parent.mkdir(parents=True, exist_ok=True)
-    with closing(sqlite3.connect(db_path)) as conn, conn:
+    with closing(sqlite3.connect(db_path)) as conn:
         create_table(conn)
         return upsert_rows(conn, df)
