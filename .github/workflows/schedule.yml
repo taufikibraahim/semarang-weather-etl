@@ -1,0 +1,54 @@
+name: Daily weather ETL
+
+on:
+  schedule:
+    - cron: "0 23 * * *" # 23:00 UTC = 06:00 WIB
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: weather-etl
+  cancel-in-progress: false
+
+jobs:
+  etl:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Restore database
+        run: |
+          mkdir -p data
+          if gh release view data-latest > /dev/null 2>&1; then
+            gh release download data-latest --pattern weather.db --dir data
+          else
+            echo "No previous database, starting fresh"
+          fi
+
+      - name: Run pipeline
+        run: python main.py
+
+      - name: Publish database
+        run: |
+          gh release view data-latest > /dev/null 2>&1 || \
+            gh release create data-latest --title "Latest database" \
+              --notes "Updated daily by the scheduled workflow"
+          gh release upload data-latest data/weather.db --clobber
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: raw-${{ github.run_id }}
+          path: data/raw
+          retention-days: 30
