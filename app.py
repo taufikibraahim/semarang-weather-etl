@@ -31,7 +31,7 @@ def load_data():
             raise e
 
     conn = sqlite3.connect(DB_PATH)
-    df = pd.read_sql_query("SELECT * FROM weather ORDER BY date ASC", conn)
+    df = pd.read_sql_query("SELECT * FROM hourly_weather ORDER BY date ASC", conn)
     conn.close()
     df["date"] = pd.to_datetime(df["date"])
     return df
