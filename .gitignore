@@ -38,3 +38,6 @@ data/
 
 # Test cache
 .pytest_cache/
+
+# Run pipeline
+run_pipeline.bat
