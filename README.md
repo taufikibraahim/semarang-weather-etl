@@ -2,14 +2,9 @@
 
 ![CI](https://github.com/taufikibraahim/semarang-weather-etl/actions/workflows/ci.yml/badge.svg)
 
-Pipeline ETL yang mengambil **prakiraan cuaca per jam untuk Semarang** dari
-[Open-Meteo](https://open-meteo.com/), menyimpan data mentah, membersihkan dan
-memvalidasinya, lalu memuatnya ke **SQLite** secara idempoten. Pipeline
-dijadwalkan harian dengan Windows Task Scheduler.
+Pipeline ETL yang mengambil **prakiraan cuaca per jam untuk Semarang** dari [Open-Meteo](https://open-meteo.com/), menyimpan data mentah, membersihkan dan memvalidasinya, lalu memuatnya ke **SQLite** secara idempoten. Pipeline dijadwalkan otomatis secara harian menggunakan **GitHub Actions** (dengan _state storage_ via **GitHub Releases**) dan diproyeksikan ke **Streamlit Dashboard** interaktif.
 
-Proyek ini dibuat sebagai latihan data engineering ujung ke ujung: extract,
-raw layer, transform dengan validasi, load idempoten, logging, tes otomatis,
-dan penjadwalan.
+Proyek ini dibuat sebagai latihan data engineering ujung ke ujung: extract, raw layer, transform dengan validasi, load idempoten, automasi cloud, logging, tes otomatis, dan visualisasi data.
 
 ## Daftar isi
 
@@ -18,7 +13,7 @@ dan penjadwalan.
 - [Struktur proyek](#struktur-proyek)
 - [Instalasi](#instalasi)
 - [Menjalankan](#menjalankan)
-- [Penjadwalan harian](#penjadwalan-harian-windows)
+- [Penjadwalan Otomatis](#penjadwalan-otomatis-github-actions)
 - [Skema database](#skema-database)
 - [Keputusan desain](#keputusan-desain)
 - [Contoh query](#contoh-query)
@@ -29,12 +24,14 @@ dan penjadwalan.
 ## Alur data
 
 ```mermaid
-flowchart LR
-    A[Open-Meteo API] --> B[extract]
-    B --> C[raw layer<br/>Parquet]
-    B --> D[transform<br/>clean + validasi]
-    D --> E[load<br/>upsert]
-    E --> F[(SQLite<br/>hourly_weather)]
+flowchart TD
+    A[Open-Meteo API] --> B[Extract]
+    B --> C[Raw Layer Parquet]
+    B --> D[Transform & Validasi]
+    D --> E[Load Upsert]
+    E --> F[(SQLite weather.db)]
+    F --> G[GitHub Release: data-latest]
+    G --> H[Streamlit Dashboard]
 ```
 
 Versi teks:
@@ -51,7 +48,7 @@ Open-Meteo API
 
 Tiap tahap berupa fungsi terpisah yang menerima input dan mengembalikan hasil,
 sehingga mudah diuji dan kelak mudah dipindah menjadi task di orkestrator
-seperti Airflow.
+seperti Github action atau Airflow.
 
 ## Fitur
 
@@ -72,10 +69,14 @@ seperti Airflow.
 
 ```
 semarang_weather_etl/
+├── .github/
+│   └── workflows/
+│       └── schedule.yml       # Automasi GitHub Actions harian (06:00 WIB)
+├── app.py                     # Interactive Dashboard (Streamlit + Plotly)
 ├── main.py                     # titik masuk: extract -> raw -> transform -> load
 ├── pytest.ini
 ├── requirements.txt
-├── run_pipeline.example.bat    # contoh pembungkus untuk Task Scheduler
+├── run_pipeline.example.bat    # contoh pembungkus untuk Task Scheduler (lokal)
 ├── src/
 │   └── pipeline/
 │       ├── config.py           # konstanta dan path
@@ -91,7 +92,6 @@ semarang_weather_etl/
 │   └── test_raw.py
 ├── data/                       # dibuat otomatis, tidak masuk Git
 │   ├── raw/                    # file Parquet mentah
-│   ├── cache/                  # cache HTTP
 │   └── weather.db              # database SQLite
 └── logs/                       # dibuat otomatis, tidak masuk Git
 ```
@@ -137,20 +137,23 @@ Contoh log yang berhasil:
 
 Exit code bernilai `0` saat sukses dan bukan `0` saat gagal.
 
-## Penjadwalan harian (Windows)
+1. **Unduh `weather.db` terbaru dari GitHub Release:**
+   ```bash
+   gh release download data-latest --pattern "weather.db" --dir ./data --clobber
+   ```
+2. **Jalankan Dashboard Streamlit**
+   ```bash
+   streamlit run app.py
+   ```
+   Aplikasi akan otomatis terbuka di browser Anda pada alamat http://localhost:8501
 
-1. Salin `run_pipeline.example.bat` menjadi `run_pipeline.bat`, lalu sesuaikan
-   path proyek di dalamnya.
-2. Uji dari PowerShell: `.\run_pipeline.bat` lalu cek `$LASTEXITCODE` (harus `0`).
-3. Di **Task Scheduler** pilih _Create Task_:
-   - **Triggers**: Daily, misalnya 06:00
-   - **Actions**: Start a program, arahkan ke `run_pipeline.bat`, isi
-     **Start in** dengan folder proyek (tanpa tanda kutip)
-   - **Settings**: jalankan segera jika jadwal terlewat; batasi waktu jalan 1 jam
-4. Klik kanan tugas, **Run**, lalu pastikan _Last Run Result_ `0x0` dan
-   `logs/pipeline.log` terisi.
+## Penjadwalan Otomatis (GitHub Actions)
 
-`run_pipeline.bat` berisi path pribadi dan masuk `.gitignore`.
+Pipeline berjalan otomatis setiap hari pukul **06:00 WIB (23:00 UTC)** melalui GitHub Actions (`.github/workflows/schedule.yml`).
+
+- **Persistent State**: File `weather.db` di-restore dan di-upload kembali ke GitHub Release tag `data-latest` menggunakan parameter `--clobber`.
+- **Artifacts**: File data mentah `data/raw/` disimpan sebagai workflow artifact dengan retensi 30 hari.
+- **Manual Trigger**: Dapat dijalankan sewaktu-waktu via tab **Actions** -> **Daily weather ETL** -> **Run workflow**.
 
 ## Skema database
 
@@ -175,17 +178,19 @@ Pemetaan nama kolom API ke nama tabel ada di `COLUMN_RENAMES` pada
 
 ## Keputusan desain
 
-| Keputusan                                                       | Alasan                                                                                        |
-| --------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| **Waktu lokal WIB tanpa zona**, disimpan sebagai teks ISO       | proyek satu kota; kunci `date` seragam dan aman di SQLite yang tidak punya tipe datetime asli |
-| **Upsert "terbaru menang"** pada `date`                         | data prakiraan berubah antar run; tabel selalu berisi tebakan terbaru dan ukurannya stabil    |
-| **Satuan di nama kolom** (`rain_mm`, `humidity_pct`)            | mencegah salah olah, misalnya menjumlahkan persentase                                         |
-| **Validasi dengan `raise ValueError`**, bukan `assert`          | `assert` bisa dimatikan dengan opsi optimasi Python                                           |
-| **Raw layer = DataFrame sebelum `clean_weather`** dalam Parquet | tipe data (termasuk timezone dan float32) terjaga, bisa diproses ulang tanpa API              |
-| **Path absolut** berbasis `BASE_DIR`                            | aman dijalankan Task Scheduler yang folder kerjanya bukan folder proyek                       |
-| **Setup cache/koneksi di dalam fungsi**, bukan level modul      | mengimpor modul tidak punya efek samping (penting untuk pytest)                               |
-| **SQLite**                                                      | sederhana, tanpa server; `load.py` terpisah sehingga mudah diganti ke PostgreSQL              |
-| **Task Scheduler** untuk versi awal                             | cukup untuk satu job; migrasi ke Airflow direncanakan                                         |
+| Keputusan                                                       | Alasan                                                                                                            |
+| --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| **Waktu lokal WIB tanpa zona**, disimpan sebagai teks ISO       | proyek satu kota; kunci `date` seragam dan aman di SQLite yang tidak punya tipe datetime asli                     |
+| **Upsert "terbaru menang"** pada `date`                         | data prakiraan berubah antar run; tabel selalu berisi tebakan terbaru dan ukurannya stabil                        |
+| **Satuan di nama kolom** (`rain_mm`, `humidity_pct`)            | mencegah salah olah, misalnya menjumlahkan persentase                                                             |
+| **Validasi dengan `raise ValueError`**, bukan `assert`          | `assert` bisa dimatikan dengan opsi optimasi Python                                                               |
+| **Raw layer = DataFrame sebelum `clean_weather`** dalam Parquet | tipe data (termasuk timezone dan float32) terjaga, bisa diproses ulang tanpa API                                  |
+| **Path absolut** berbasis `BASE_DIR`                            | aman dijalankan Task Scheduler yang folder kerjanya bukan folder proyek                                           |
+| **Setup cache/koneksi di dalam fungsi**, bukan level modul      | mengimpor modul tidak punya efek samping (penting untuk pytest)                                                   |
+| **SQLite**                                                      | sederhana, tanpa server; `load.py` terpisah sehingga mudah diganti ke PostgreSQL                                  |
+| **GitHub Actions**                                              | Otomasi harian berbasis cloud tanpa bergantung pada komputer lokal                                                |
+| **GitHub Release (`data-latest`) sebagai State Storage**        | Menyimpan file `weather.db` secara persisten antar run di runner ephemeral GitHub Actions tanpa cloud DB berbayar |
+| **Streamlit + Plotly**                                          | Visualisasi interaktif cepat dengan caching otomatis (`@st.cache_data`) dan grafik dual-axis                      |
 
 ### Sifat data
 
@@ -301,16 +306,14 @@ flake8 src tests main.py
 
 ## Keterbatasan
 
-- Komputer harus menyala agar jadwal berjalan.
-- SQLite hanya cocok untuk satu penulis.
-- Data berupa prakiraan, bukan observasi.
-- Folder `data/raw/` tumbuh satu file per run dan belum ada retensi otomatis.
-- Penjadwalan khusus Windows.
+- Data berupa prakiraan (forecast model), bukan observasi fisik stasiun cuaca.
+- Database SQLite di GitHub Release hanya cocok untuk lingkungan rilis analitis ringan / dashboard single-writer.
 
 ## Rencana pengembangan
 
 - [x] Query analitik dan visualisasi
 - [x] Retensi file raw (hapus yang lebih lama dari N hari)
 - [x] GitHub Actions untuk menjalankan tes dan flake8
-- [x] Migrasi orkestrasi ke Airflow (Docker)
-- [x] Migrasi database ke PostgreSQL
+- [x] GitHub Actions untuk otomatisasi pipeline harian
+- [x] Dashboard Interaktif dengan Streamlit & Plotly
+- [x] Deploy Dashboard ke Streamlit Community Cloud
