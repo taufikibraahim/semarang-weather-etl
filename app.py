@@ -102,7 +102,13 @@ try:
             filtered_df,
             x="date",
             y=["temperature_c", "apparent_temperature_c"],
-            labels={"value": "Suhu (°C)", "date": "Waktu", "variable": "Metrik"},
+            labels={
+                "temperature_c": "Suhu Udara (°C)",
+                "apparent_temperature_c": "Terasa Seperti (°C)",
+                "value": "Suhu (°C)",
+                "date": "Waktu",
+                "variable": "Metrik",
+            },
             markers=True,
         )
         fig_temp.update_layout(legend_title_text="", hovermode="x unified")
