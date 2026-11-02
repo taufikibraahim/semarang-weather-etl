@@ -101,7 +101,7 @@ try:
         fig_temp = px.line(
             filtered_df,
             x="date",
-            y=["temperature_c", "apparent_temperature_c"],
+            y=["Suhu Udara", "Terasa Seperti"],
             labels={"value": "Suhu (°C)", "date": "Waktu", "variable": "Metrik"},
             markers=True,
         )
