@@ -97,14 +97,22 @@ try:
     chart_col1, chart_col2 = st.columns(2)
 
     with chart_col1:
-        st.subheader("Perbandingan Suhu vs Real Feel")
+        st.subheader("📈 Perbandingan Suhu vs Real Feel")
         fig_temp = px.line(
             filtered_df,
             x="date",
             y=["temperature_c", "apparent_temperature_c"],
-            labels={"value": "Suhu (°C)", "date": "Waktu", "variable": "Metrik"},
+            labels={"value": "Suhu (°C)", "date": "Waktu"},
             markers=True,
         )
+
+        # Mengubah nama teks legenda secara langsung
+        new_names = {
+            "temperature_c": "Suhu Udara (°C)",
+            "apparent_temperature_c": "Terasa Seperti (°C)",
+        }
+        fig_temp.for_each_trace(lambda t: t.update(name=new_names.get(t.name, t.name)))
+
         fig_temp.update_layout(legend_title_text="", hovermode="x unified")
         st.plotly_chart(fig_temp, use_container_width=True)
 
