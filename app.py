@@ -7,6 +7,17 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
+from src.pipeline.queries import (
+    daily_rain,
+    daily_temperature,
+    data_overview,
+    hottest_days,
+    most_humid_days,
+    open_readonly,
+    rain_by_hour,
+    temperature_vs_daily_average,
+)
+
 # URL rilis publik tempat weather.db disimpan oleh GitHub Actions
 DB_URL = "https://github.com/taufikibraahim/semarang-weather-etl/releases/download/data-latest/weather.db"
 DB_PATH = "data/weather.db"
@@ -179,5 +190,131 @@ try:
     with st.expander("Lihat Detail Data Mentah"):
         st.dataframe(filtered_df, use_container_width=True)
 
+    st.markdown("---")
+    st.header("📊 Analisis Cuaca Mendalam (Insights)")
+
+    # 1. DATA OVERVIEW (Ringkasan Data)
+    conn = open_readonly(DB_PATH)
+    df_overview = data_overview(conn)
+    if not df_overview.empty:
+        st.subheader("Ringkasan Data Historis")
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Total Baris Data", f"{df_overview['row_count'].iloc[0]} Jam")
+        col2.metric("Tanggal Mulai", df_overview["first_date"].iloc[0][:10])
+        col3.metric("Tanggal Akhir", df_overview["last_date"].iloc[0][:10])
+
+    st.markdown("---")
+
+    # 2. DAILY TEMPERATURE (Suhu Harian)
+    st.subheader("Tren Suhu Harian (Min, Rata-rata, Max)")
+    df_daily_temp = daily_temperature(conn)
+    fig_temp_trend = px.line(
+        df_daily_temp,
+        x="day",
+        y=["min_temp_c", "avg_temp_c", "max_temp_c"],
+        labels={"day": "Tanggal", "value": "Suhu (°C)"},
+        markers=True,
+        color_discrete_map={
+            "min_temp_c": "#1f77b4",
+            "avg_temp_c": "#2ca02c",
+            "max_temp_c": "#d62728",
+        },
+    )
+    # Ubah nama legenda
+    temp_names = {
+        "min_temp_c": "Suhu Minimum",
+        "avg_temp_c": "Suhu Rata-rata",
+        "max_temp_c": "Suhu Maksimum",
+    }
+    fig_temp_trend.for_each_trace(
+        lambda t: t.update(name=temp_names.get(t.name, t.name))
+    )
+    fig_temp_trend.update_layout(legend_title_text="", hovermode="x unified")
+    st.plotly_chart(fig_temp_trend, use_container_width=True)
+
+    st.markdown("---")
+
+    # 3. RAIN BY HOUR & DAILY RAIN (Layout 2 Kolom)
+    col_rain1, col_rain2 = st.columns(2)
+    with col_rain1:
+        st.subheader("Jam Paling Sering Hujan")
+        df_rain_hour = rain_by_hour(conn)
+        fig_rain_hour = px.bar(
+            df_rain_hour,
+            x="hour",
+            y="avg_rain_mm",
+            labels={"hour": "Jam (WIB)", "avg_rain_mm": "Rata-rata Hujan (mm)"},
+            color="avg_rain_mm",
+            color_continuous_scale="Blues",
+        )
+        fig_rain_hour.update_xaxes(type="category")  # Format jam agar tidak ada desimal
+        fig_rain_hour.update_layout(coloraxis_showscale=False)
+        st.plotly_chart(fig_rain_hour, use_container_width=True)
+
+    with col_rain2:
+        st.subheader("Total Hujan Harian")
+        df_daily_rain = daily_rain(conn)
+        fig_daily_rain = px.bar(
+            df_daily_rain,
+            x="day",
+            y="total_rain_mm",
+            labels={"day": "Tanggal", "total_rain_mm": "Total Hujan (mm)"},
+            color="total_rain_mm",
+            color_continuous_scale="Teal",
+        )
+        fig_daily_rain.update_layout(coloraxis_showscale=False)
+        st.plotly_chart(fig_daily_rain, use_container_width=True)
+
+    st.markdown("---")
+
+    # 4. HOTTEST DAYS & MOST HUMID DAYS (Layout 2 Kolom)
+    col_top1, col_top2 = st.columns(2)
+    with col_top1:
+        st.subheader("5 Hari Terpanas")
+        df_hottest = hottest_days(conn, limit=5)
+        df_hottest.rename(
+            columns={
+                "day": "Tanggal",
+                "max_temp_c": "Suhu Max (°C)",
+                "avg_temp_c": "Suhu Rata-rata (°C)",
+            },
+            inplace=True,
+        )
+        st.dataframe(df_hottest, use_container_width=True, hide_index=True)
+
+    with col_top2:
+        st.subheader("5 Hari Paling Lembap")
+        df_humid = most_humid_days(conn, limit=5)
+        df_humid.rename(
+            columns={"day": "Tanggal", "avg_humidity_pct": "Kelembapan Rata-rata (%)"},
+            inplace=True,
+        )
+        st.dataframe(df_humid, use_container_width=True, hide_index=True)
+
+    st.markdown("---")
+
+    # 5. TEMPERATURE VS DAILY AVERAGE (Selisih Suhu)
+    st.subheader("Fluktuasi Suhu vs Rata-rata Harian")
+    st.write(
+        "Grafik ini menunjukkan seberapa jauh suhu pada jam tertentu menyimpang dari rata-rata suhu di hari tersebut (Merah = Lebih Panas, Biru = Lebih Dingin)."
+    )
+    df_temp_vs_avg = temperature_vs_daily_average(conn)
+    fig_diff = px.bar(
+        df_temp_vs_avg,
+        x="date",
+        y="diff_from_avg_c",
+        labels={
+            "date": "Waktu (Jam)",
+            "diff_from_avg_c": "Selisih dari Rata-rata (°C)",
+        },
+        color="diff_from_avg_c",
+        color_continuous_scale="RdBu_r",  # Skala Red-Blue reversed (merah panas, biru dingin)
+    )
+    fig_diff.update_layout(coloraxis_showscale=False)
+    st.plotly_chart(fig_diff, use_container_width=True)
+
+    # Tutup koneksi
+    conn.close()
+
 except Exception as e:
-    st.error(f"Gagal memuat data dari `data/weather.db`: {e}")
+    st.error(f"Gagal memuat data: {e}")
