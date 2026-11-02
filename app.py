@@ -97,7 +97,7 @@ try:
     chart_col1, chart_col2 = st.columns(2)
 
     with chart_col1:
-        st.subheader("📈 Perbandingan Suhu vs Real Feel")
+        st.subheader("Perbandingan Suhu vs Real Feel")
         fig_temp = px.line(
             filtered_df,
             x="date",
