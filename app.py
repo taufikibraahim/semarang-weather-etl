@@ -52,7 +52,7 @@ try:
     # ==========================================
     # MENU NAVIGASI SIDEBAR
     # ==========================================
-    st.sidebar.header("📌 Navigasi Menu")
+    st.sidebar.header("Navigasi Menu")
     menu = st.sidebar.radio(
         "Pilih Halaman Dashboard:", ["Cuaca Terkini", "Analisis Mendalam (Insights)"]
     )
@@ -109,7 +109,7 @@ try:
         # Visualisasi Utama
         chart_col1, chart_col2 = st.columns(2)
         with chart_col1:
-            st.subheader("📈 Perbandingan Suhu vs Real Feel")
+            st.subheader("Perbandingan Suhu vs Real Feel")
             fig_temp = px.line(
                 filtered_df,
                 x="date",
@@ -128,7 +128,7 @@ try:
             st.plotly_chart(fig_temp, use_container_width=True)
 
         with chart_col2:
-            st.subheader("🌧️ Curah Hujan & Peluang Hujan")
+            st.subheader("Curah Hujan & Peluang Hujan")
             fig_rain = go.Figure()
             fig_rain.add_trace(
                 go.Bar(
@@ -158,7 +158,7 @@ try:
 
         chart_col3, chart_col4 = st.columns(2)
         with chart_col3:
-            st.subheader("💨 Tren Kecepatan Angin")
+            st.subheader("Tren Kecepatan Angin")
             fig_wind = px.line(
                 filtered_df,
                 x="date",
@@ -171,7 +171,7 @@ try:
             st.plotly_chart(fig_wind, use_container_width=True)
 
         with chart_col4:
-            st.subheader("💧 Tren Kelembaban Udara")
+            st.subheader("Tren Kelembaban Udara")
             fig_hum = px.area(
                 filtered_df,
                 x="date",
@@ -190,7 +190,7 @@ try:
     # HALAMAN 2: ANALISIS MENDALAM (INSIGHTS)
     # ==========================================
     elif menu == "Analisis Mendalam (Insights)":
-        st.header("📊 Analisis Historis & Pola Cuaca")
+        st.header("Analisis Historis & Pola Cuaca")
         st.write(
             "Halaman ini menggunakan seluruh data historis di dalam database (tanpa filter tanggal) untuk menemukan pola."
         )
@@ -269,7 +269,7 @@ try:
         # 4. Top 5 Terpanas & Terlembap
         col_top1, col_top2 = st.columns(2)
         with col_top1:
-            st.subheader("🔥 5 Hari Terpanas")
+            st.subheader("5 Hari Terpanas")
             df_hottest = hottest_days(conn, limit=5)
             df_hottest.rename(
                 columns={
@@ -282,7 +282,7 @@ try:
             st.dataframe(df_hottest, use_container_width=True, hide_index=True)
 
         with col_top2:
-            st.subheader("💧 5 Hari Paling Lembap")
+            st.subheader("5 Hari Paling Lembap")
             df_humid = most_humid_days(conn, limit=5)
             df_humid.rename(
                 columns={
