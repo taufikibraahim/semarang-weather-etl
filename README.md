@@ -1,6 +1,9 @@
 # Semarang Weather ETL
 
-![CI](https://github.com/taufikibraahim/semarang-weather-etl/actions/workflows/ci.yml/badge.svg)
+[![CI](https://github.com/taufikibraahim/semarang-weather-etl/actions/workflows/ci.yml/badge.svg)](https://github.com/taufikibraahim/semarang-weather-etl/actions/workflows/ci.yml)
+[![Daily ETL](https://github.com/taufikibraahim/semarang-weather-etl/actions/workflows/schedule.yml/badge.svg)](https://github.com/taufikibraahim/semarang-weather-etl/actions/workflows/schedule.yml)
+
+**Demo dashboard:** <https://semarang-weather-byibra.streamlit.app/>
 
 Pipeline ETL yang mengambil **prakiraan cuaca per jam untuk Semarang** dari [Open-Meteo](https://open-meteo.com/), menyimpan data mentah, membersihkan dan memvalidasinya, lalu memuatnya ke **SQLite** secara idempoten. Pipeline dijadwalkan otomatis secara harian menggunakan **GitHub Actions** (dengan _state storage_ via **GitHub Releases**) dan diproyeksikan ke **Streamlit Dashboard** interaktif.
 
@@ -14,6 +17,7 @@ Proyek ini dibuat sebagai latihan data engineering ujung ke ujung: extract, raw 
 - [Instalasi](#instalasi)
 - [Menjalankan](#menjalankan)
 - [Penjadwalan Otomatis](#penjadwalan-otomatis-github-actions)
+- [Dashboard Streamlit](#dashboard-streamlit)
 - [Skema database](#skema-database)
 - [Keputusan desain](#keputusan-desain)
 - [Contoh query](#contoh-query)
@@ -30,7 +34,7 @@ flowchart TD
     B --> D[Transform & Validasi]
     D --> E[Load Upsert]
     E --> F[(SQLite weather.db)]
-    F --> G[GitHub Release: data-latest]
+    F <--> G[GitHub Release: data-latest]
     G --> H[Streamlit Dashboard]
 ```
 
@@ -44,11 +48,19 @@ Open-Meteo API
   transform  (timezone, nama kolom + satuan, validasi rentang)
       |
     load ------> SQLite (data/weather.db, tabel hourly_weather)
+                      |
+                      +--> GitHub Release `data-latest` (disimpan antar run)
+                                  |
+                                  +--> Dashboard Streamlit (unduh saat start)
 ```
+
+Pada setiap run terjadwal, `weather.db` diunduh dari Release, di-upsert dengan
+data baru, lalu diunggah kembali. Ini perlu karena runner GitHub bersifat
+sementara dan seluruh isinya hilang setelah job selesai.
 
 Tiap tahap berupa fungsi terpisah yang menerima input dan mengembalikan hasil,
 sehingga mudah diuji dan kelak mudah dipindah menjadi task di orkestrator
-seperti Github action atau Airflow.
+seperti GitHub Actions atau Airflow. Airflow sempat dicoba lewat Docker Compose, tetapi terlalu berat untuk laptop 2 inti, sehingga dipilih GitHub Actions.
 
 ## Fitur
 
@@ -63,16 +75,21 @@ seperti Github action atau Airflow.
   tercatat lengkap dengan traceback.
 - **Path absolut** berbasis lokasi proyek, aman dijalankan penjadwal dari folder
   mana pun.
-- **Tes otomatis** dengan pytest (transform, load, raw layer).
+- **Query analitik** (`queries.py`): fungsi SQL read-only yang mengembalikan DataFrame, termasuk CTE dan window function.
+- **Penjadwalan harian** dengan GitHub Actions; komputer lokal tidak perlu menyala.
+- **Dashboard Streamlit** dengan dua halaman: cuaca per jam (dengan penanda waktu sekarang) dan analisis historis.
+- **Tes otomatis** dengan pytest (transform, load, raw layer, visualisasi) dan flake8, dijalankan di CI pada setiap push dan Pull Request.
 
 ## Struktur proyek
 
 ```
-semarang_weather_etl/
+semarang-weather-etl/
+├── .devcontainer/              # konfigurasi Codespaces / Dev Container
 ├── .github/
 │   └── workflows/
-│       └── schedule.yml       # Automasi GitHub Actions harian (06:00 WIB)
-├── app.py                     # Interactive Dashboard (Streamlit + Plotly)
+│       ├── ci.yml              # flake8 + pytest (push ke main dan PR)
+│       └── schedule.yml        # ETL harian 06:00 WIB + tombol manual
+├── app.py                      # dashboard (Streamlit + Plotly)
 ├── main.py                     # titik masuk: extract -> raw -> transform -> load
 ├── pytest.ini
 ├── requirements.txt
@@ -84,12 +101,15 @@ semarang_weather_etl/
 │       ├── raw.py              # simpan data mentah (Parquet)
 │       ├── transform.py        # bersihkan dan validasi
 │       ├── load.py             # upsert ke SQLite
+│       ├── queries.py          # query analitik (read-only)
+│       ├── visualize.py        # grafik PNG (matplotlib)
 │       └── logging_config.py   # logging ke terminal + file
 ├── tests/
 │   ├── conftest.py             # fixture bersama
 │   ├── test_transform.py
 │   ├── test_load.py
-│   └── test_raw.py
+│   ├── test_raw.py
+│   └── test_visualize.py
 ├── data/                       # dibuat otomatis, tidak masuk Git
 │   ├── raw/                    # file Parquet mentah
 │   └── weather.db              # database SQLite
@@ -102,7 +122,7 @@ Prasyarat: Python 3.10 atau lebih baru dan Git.
 
 ```bash
 git clone https://github.com/taufikibraahim/semarang-weather-etl
-cd semarang_weather_etl
+cd semarang-weather-etl
 
 python -m venv .venv
 .venv\Scripts\activate          # Windows (PowerShell/CMD)
@@ -112,6 +132,8 @@ pip install -r requirements.txt
 ```
 
 ## Menjalankan
+
+### Pipeline ETL
 
 Jalankan dari **folder induk proyek**:
 
@@ -137,7 +159,9 @@ Contoh log yang berhasil:
 
 Exit code bernilai `0` saat sukses dan bukan `0` saat gagal.
 
-1. **Unduh `weather.db` terbaru dari GitHub Release:**
+### Dashboard lokal
+
+1. **Unduh `weather.db` terbaru dari GitHub Release** (butuh [GitHub CLI](https://cli.github.com/)), atau jalankan pipeline sendiri:
    ```bash
    gh release download data-latest --pattern "weather.db" --dir ./data --clobber
    ```
@@ -154,6 +178,23 @@ Pipeline berjalan otomatis setiap hari pukul **06:00 WIB (23:00 UTC)** melalui G
 - **Persistent State**: File `weather.db` di-restore dan di-upload kembali ke GitHub Release tag `data-latest` menggunakan parameter `--clobber`.
 - **Artifacts**: File data mentah `data/raw/` disimpan sebagai workflow artifact dengan retensi 30 hari.
 - **Manual Trigger**: Dapat dijalankan sewaktu-waktu via tab **Actions** -> **Daily weather ETL** -> **Run workflow**.
+- **Tanpa duplikasi**: karena upsert idempoten, menjalankan workflow berkali-kali tidak menambah baris ganda; jumlah baris hanya bertambah ketika ada tanggal baru.
+
+Langkah tiap run: checkout kode, pasang dependensi, _restore_ database dari Release, jalankan `main.py`, _publish_ database kembali ke Release, lalu simpan file raw sebagai artifact.
+
+Catatan: jadwal GitHub bisa terlambat saat beban tinggi, dan pada repo yang lama tanpa aktivitas jadwal dapat dinonaktifkan otomatis (aktifkan kembali dari tab Actions).
+
+## Dashboard Streamlit
+
+Dashboard (`app.py`) di-deploy di Streamlit Community Cloud: <ISI-URL-STREAMLIT-KAMU>.
+Saat start, aplikasi mengunduh `weather.db` dari Release `data-latest` dan menyimpannya di cache selama 1 jam (`@st.cache_data(ttl=3600)`), sehingga data ikut diperbarui setelah workflow harian berjalan.
+
+| Halaman                          | Isi                                                                                                                                                                                                                             |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Cuaca Terkini**                | tanggal dan jam hari ini (WIB), kartu kondisi pada jam terdekat, grafik suhu vs suhu terasa, hujan dan peluang hujan, angin, kelembapan, tabel data mentah. Ada filter rentang tanggal dan garis putus-putus penanda "sekarang" |
+| **Analisis Mendalam (Insights)** | ringkasan ketersediaan data, tren suhu harian (min, rata-rata, max), jam paling sering hujan, total hujan harian, 5 hari terpanas dan terlembap, selisih suhu terhadap rata-rata harian                                         |
+
+Kartu "Kondisi Cuaca Terkini" menampilkan **prakiraan** untuk jam terdekat dengan waktu sekarang, bukan hasil pengukuran. Jika filter tanggal tidak memuat hari ini, muncul peringatan dan yang ditampilkan adalah jam terdekat dalam rentang itu.
 
 ## Skema database
 
@@ -191,6 +232,8 @@ Pemetaan nama kolom API ke nama tabel ada di `COLUMN_RENAMES` pada
 | **GitHub Actions**                                              | Otomasi harian berbasis cloud tanpa bergantung pada komputer lokal                                                |
 | **GitHub Release (`data-latest`) sebagai State Storage**        | Menyimpan file `weather.db` secara persisten antar run di runner ephemeral GitHub Actions tanpa cloud DB berbayar |
 | **Streamlit + Plotly**                                          | Visualisasi interaktif cepat dengan caching otomatis (`@st.cache_data`) dan grafik dual-axis                      |
+| **Koneksi read-only** pada `queries.py`                         | query analitik tidak bisa mengubah data secara tidak sengaja                                                      |
+| **Waktu "sekarang" dihitung eksplisit di zona `Asia/Jakarta`**  | server Streamlit berjalan dalam UTC; tanpa konversi, jam terdekat yang dipilih akan meleset 7 jam                 |
 
 ### Sifat data
 
@@ -199,6 +242,8 @@ jam yang sama bisa berbeda antar run. Opsi `past_days=7` mengambil beberapa hari
 ke belakang, tetapi tetap berasal dari model.
 
 ## Contoh query
+
+Hasil di bawah adalah **contoh** dari data awal proyek (3–18 Oktober 2026); isi database terkini berbeda dan terus bertambah.
 
 Query ada di `src/pipeline/queries.py`, tiap query berupa fungsi yang
 mengembalikan DataFrame:
@@ -248,7 +293,6 @@ data lengkap yang dihitung.
 
 ### Total hujan per hari
 
-cls
 `rain_mm` dijumlahkan, sedangkan probabilitas hanya diambil nilai
 maksimumnya karena persentase tidak boleh dijumlahkan.
 
@@ -294,6 +338,7 @@ pytest -v
 | `test_transform.py` | tanggal tanpa zona, kolom di-rename, input tidak berubah, data buruk ditolak    |
 | `test_load.py`      | database dan tabel dibuat, idempoten, upsert menimpa nilai lama, tipe `REAL`    |
 | `test_raw.py`       | file terbentuk, folder dibuat otomatis, roundtrip data utuh, nama tidak bentrok |
+| `test_visualize.py` | gambar terbentuk, data kosong ditolak                                           |
 
 Tes memakai DataFrame buatan dan folder sementara (`tmp_path`); tidak memanggil
 API dan tidak menyentuh database asli.
@@ -304,15 +349,21 @@ Pengecekan gaya kode:
 flake8 src tests main.py
 ```
 
+CI (`.github/workflows/ci.yml`) menjalankan kedua perintah itu pada setiap push ke `main` dan setiap Pull Request.
+
 ## Keterbatasan
 
 - Data berupa prakiraan (forecast model), bukan observasi fisik stasiun cuaca.
-- Database SQLite di GitHub Release hanya cocok untuk lingkungan rilis analitis ringan / dashboard single-writer.
+- Database SQLite di GitHub Release hanya cocok untuk lingkungan rilis analitis ringan / dashboard single-writer; `concurrency` pada workflow mencegah dua run bersamaan.
+- Jika langkah _restore_ gagal, pipeline bisa mengunggah database yang hanya berisi data terbaru dan menimpa riwayat (belum ada pengecekan jumlah baris).
+- Jadwal GitHub bisa terlambat dan bisa dinonaktifkan otomatis pada repo yang lama tanpa aktivitas.
+- File raw hanya disimpan sebagai artifact selama 30 hari, tidak permanen.
+- Dashboard di tier gratis Streamlit bisa "tidur" saat lama tidak dibuka, dan datanya mengikuti cache 1 jam.
 
 ## Rencana pengembangan
 
 - [x] Query analitik dan visualisasi
-- [x] Retensi file raw (hapus yang lebih lama dari N hari)
+- [x] Retensi file raw lewat artifact GitHub (30 hari)
 - [x] GitHub Actions untuk menjalankan tes dan flake8
 - [x] GitHub Actions untuk otomatisasi pipeline harian
 - [x] Dashboard Interaktif dengan Streamlit & Plotly
