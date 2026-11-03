@@ -90,11 +90,24 @@ try:
             st.warning("Tidak ada data pada rentang tanggal yang dipilih.")
             st.stop()
 
+        HARI = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"]
         now = pd.Timestamp.now(tz="Asia/Jakarta").tz_localize(None)
-        latest_data = filtered_df.iloc[(filtered_df["date"] - now).abs().argmin()]
+        nearest = (filtered_df["date"] - now).abs().argmin()
+        latest_data = filtered_df.iloc[nearest]
+        now_in_range = filtered_df["date"].min() <= now <= filtered_df["date"].max()
+
+        st.info(
+            f"Hari ini: {HARI[now.weekday()]}, {now:%d-%m-%Y} · pukul {now:%H:%M} WIB"
+        )
 
         # Indikator KPI
         st.subheader("Kondisi Cuaca Terkini")
+        st.caption(f"Prakiraan untuk jam {latest_data['date']:%d-%m-%Y %H:%M} WIB")
+        if abs(latest_data["date"] - now) > pd.Timedelta(hours=1):
+            st.warning(
+                "Hari ini tidak ada dalam rentang tanggal yang dipilih; "
+                "yang ditampilkan adalah jam terdekat dalam rentang itu."
+            )
         col1, col2, col3 = st.columns(3)
         col1.metric("Suhu Udara", f"{latest_data['temperature_c']:.1f} °C")
         col2.metric("Terasa Seperti", f"{latest_data['apparent_temperature_c']:.1f} °C")
@@ -126,6 +139,8 @@ try:
                 lambda t: t.update(name=new_names.get(t.name, t.name))
             )
             fig_temp.update_layout(legend_title_text="", hovermode="x unified")
+            if now_in_range:
+                fig_temp.add_vline(x=now, line_dash="dash", line_color="gray")
             st.plotly_chart(fig_temp, use_container_width=True)
 
         with chart_col2:
@@ -155,6 +170,8 @@ try:
                 legend=dict(x=0, y=1.15, orientation="h"),
                 hovermode="x unified",
             )
+            if now_in_range:
+                fig_rain.add_vline(x=now, line_dash="dash", line_color="gray")
             st.plotly_chart(fig_rain, use_container_width=True)
 
         chart_col3, chart_col4 = st.columns(2)
