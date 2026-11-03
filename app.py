@@ -90,7 +90,8 @@ try:
             st.warning("Tidak ada data pada rentang tanggal yang dipilih.")
             st.stop()
 
-        latest_data = filtered_df.iloc[-1]
+        now = pd.Timestamp.now(tz="Asia/Jakarta").tz_localize(None)
+        latest_data = filtered_df.iloc[(filtered_df["date"] - now).abs().argmin()]
 
         # Indikator KPI
         st.subheader("Kondisi Cuaca Terkini")
