@@ -31,14 +31,27 @@ jobs:
       - name: Restore database
         run: |
           mkdir -p data
-          if gh release view data-latest > /dev/null 2>&1; then
+          if out=$(gh release view data-latest 2>&1); then
             gh release download data-latest --pattern weather.db --dir data
-          else
+          elif echo "$out" | grep -qi "not found"; then
             echo "No previous database, starting fresh"
+          else
+            echo "$out"
+            exit 1
           fi
 
       - name: Run pipeline
         run: python main.py
+
+      - name: Sanity check
+        run: |
+          python - <<'EOF'
+          import sqlite3
+          n = sqlite3.connect("data/weather.db").execute(
+              "SELECT COUNT(*) FROM hourly_weather").fetchone()[0]
+          print("rows:", n)
+          assert n >= 300, f"too few rows: {n}"
+          EOF
 
       - name: Publish database
         run: |
